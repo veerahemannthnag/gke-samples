@@ -1,0 +1,18 @@
+
+Download Velero from: https://github.com/vmware-tanzu/velero/releases/tag/v1.9.3
+https://github.com/vmware-tanzu/velero/releases/download/v1.9.3/velero-v1.9.3-linux-amd64.tar.gz
+tar -xvzf velero-v1.9.3-linux-amd64.tar.gz
+cd velero-v1.9.3-linux-amd64
+./velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket velero-veerahemannthnag --secret-file ./credentials-velero.json --wait
+
+cd examples/nginx-app
+#Deploy sample nginx app to test backup
+kubectl apply -f base.yaml
+kubectl apply -f with-pv.yaml
+
+kubectl delete ns nginx-example
+./velero backup create backup --include-namespaces nginx-example
+./velero backup describe backup
+./velero backup get
+./velero restore create --from-backup backup
+./velero restore describe backup-20221117093906
