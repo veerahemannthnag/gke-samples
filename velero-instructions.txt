@@ -10,9 +10,10 @@ cd examples/nginx-app
 kubectl apply -f base.yaml
 kubectl apply -f with-pv.yaml
 
-kubectl delete ns nginx-example
+
 ./velero backup create backup --include-namespaces nginx-example
 ./velero backup describe backup
+kubectl delete ns nginx-example
 ./velero backup get
 ./velero restore create --from-backup backup
 ./velero restore describe backup-20221117093906
