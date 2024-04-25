@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Function to check rollout status and report
+function check_rollout_status() {
+  deployment_name="$1"
+
+  # Get rollout status using kubectl
+  rollout_status=$(kubectl rollout status deployment/"$deployment_name" 2>&1)
+
+  # Check for errors in rollout status output
+  if [[ $? -ne 0 ]]; then
+    echo "Error getting rollout status for deployment: $deployment_name"
+    echo "$rollout_status"
+    exit 1
+  fi
+
+  # Extract desired pods and current new/old pods
+  desired_pods=$(echo "$rollout_status" | grep -Eo 'desired replicas (\d+)' | grep -Eo '\d+')
+  new_pods=$(echo "$rollout_status" | grep -Eo 'new replicas (\d+)' | grep -Eo '\d+')
+  old_pods=$(echo "$rollout_status" | grep -Eo 'old replicas (\d+)' | grep -Eo '\d+')
+
+  # Check if rollout is complete (desired pods == new pods)
+  if [[ "$desired_pods" -eq "$new_pods" ]]; then
+    echo "Deployment $deployment_name rollout successful!"
+  else
+    echo "Deployment $deployment_name rollout in progress..."
+    echo "  Desired pods: $desired_pods"
+    echo "  New pods:      $new_pods"
+    echo "  Old pods:      $old_pods"
+  fi
+}
+
+# Get deployment name (optional argument)
+deployment_name="${1:-}"
+
+# Check if deployment name is provided
+if [[ -z "$deployment_name" ]]; then
+  echo "Usage: $0 <deployment_name>"
+  exit 1
+fi
+
+# Continuously check rollout status with a delay
+while true; do
+  check_rollout_status "$deployment_name"
+  sleep 5
+done
