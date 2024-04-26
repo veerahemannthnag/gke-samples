@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Function to check the status of pods starting with "abc-" and print logs for pods that are not running
+check_pod_status() {
+    # Get the names of pods starting with "abc-"
+    pod_names=$(kubectl get pods | grep "^abc-" | awk '{print $1}')
+
+    # Iterate through each pod
+    for pod in $pod_names; do
+        # Get the status of the pod
+        pod_status=$(kubectl get pod $pod -o jsonpath='{.status.phase}')
+
+        # If the pod is not running, print its logs
+        if [[ $pod_status != "Running" ]]; then
+            echo "Pod $pod is not running. Printing logs:"
+            kubectl logs $pod
+        fi
+    done
+}
+
+# Call the function
+check_pod_status
