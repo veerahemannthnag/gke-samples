@@ -37,3 +37,26 @@ check_deployment_status() {
 
 # Call the function to check deployment status
 check_deployment_status
+
+
+
+# Define the name of the deployment
+DEPLOYMENT_NAME="your-deployment-name"
+
+# Define the timeout in seconds (adjust as needed)
+TIMEOUT=300
+
+# Function to check deployment status
+check_deployment_status() {
+    # Run the kubectl rollout status command with a timeout
+    if timeout ${TIMEOUT}s kubectl rollout status deployment/${DEPLOYMENT_NAME} -n <namespace>; then
+        echo "Deployment ${DEPLOYMENT_NAME} has been successfully rolled out."
+        exit 0
+    else
+        echo "Timeout: Deployment ${DEPLOYMENT_NAME} rollout took longer than ${TIMEOUT} seconds."
+        exit 1
+    fi
+}
+
+# Call the function to check deployment status
+check_deployment_status
