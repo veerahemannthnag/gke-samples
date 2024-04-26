@@ -22,6 +22,7 @@ function check_rollout_status() {
   # Check if rollout is complete (desired pods == new pods)
   if [[ "$desired_pods" -eq "$new_pods" ]]; then
     echo "Deployment $deployment_name rollout successful!"
+    exit 0  # Exit script after successful rollout
   else
     echo "Deployment $deployment_name rollout in progress..."
     echo "  Desired pods: $desired_pods"
@@ -39,8 +40,5 @@ if [[ -z "$deployment_name" ]]; then
   exit 1
 fi
 
-# Continuously check rollout status with a delay
-while true; do
-  check_rollout_status "$deployment_name"
-  sleep 5
-done
+# Check rollout status only once
+check_rollout_status "$deployment_name"
