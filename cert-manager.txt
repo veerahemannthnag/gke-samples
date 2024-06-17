@@ -1,0 +1,46 @@
+kubectl create secret generic venafi-credentials \
+    --namespace cert-manager \
+    --from-literal=zone=<YOUR_VENAFI_ZONE> \
+    --from-literal=clientId=<YOUR_VENAFI_CLIENT_ID> 
+
+  ---
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: venafi-issuer
+spec:
+  venafi:
+    zone: <YOUR_VENAFI_ZONE>
+    tpp:
+      url: <YOUR_VENAFI_TPP_URL> # If using Venafi TPP
+      credentialsRef:
+        name: venafi-credentials
+    cloud:
+      url: <YOUR_VENAFI_CLOUD_URL> # If using Venafi Cloud
+      apiTokenSecretRef:
+        name: venafi-credentials
+    keyPasswordSecretRef:
+        name: venafi-credentials
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: example-com-tls
+  namespace: default 
+spec:
+  secretName: example-com-tls
+  dnsNames:
+    - example.com
+    - www.example.com
+  issuerRef:
+    name: venafi-issuer
+    kind: ClusterIssuer
+---
+kubectl get certificate example-com-tls -n default
+kubectl describe certificate example-com-tls -n default
+
+---
+github.com/redpanda-data/documentation
+github.com/appgate/sdp-k8s-injector
+          
