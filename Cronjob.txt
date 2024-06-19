@@ -1,0 +1,127 @@
+#!/bin/bash
+
+# Variables
+API_URL="https://your-api-endpoint.com"
+SECRET_NAME="your-secret"
+NAMESPACE="default"
+
+# Send POST request and capture the response
+RESPONSE=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d '{"your":"payload"}')
+
+# Extract token and user values from the response
+TOKEN=$(echo $RESPONSE | jq -r '.token')
+USER=$(echo $RESPONSE | jq -r '.user')
+
+# Update the Kubernetes secret
+kubectl create secret generic $SECRET_NAME \
+  --namespace $NAMESPACE \
+  --from-literal=token="$TOKEN" \
+  --from-literal=user="$USER" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: update-secret-script
+  namespace: default
+data:
+  update-secret.sh: |
+    #!/bin/bash
+
+    # Variables
+    API_URL="https://your-api-endpoint.com"
+    SECRET_NAME="your-secret"
+    NAMESPACE="default"
+
+    # Send POST request and capture the response
+    RESPONSE=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d '{"your":"payload"}')
+
+    # Extract token and user values from the response
+    TOKEN=$(echo $RESPONSE | jq -r '.token')
+    USER=$(echo $RESPONSE | jq -r '.user')
+
+    # Update the Kubernetes secret
+    kubectl create secret generic $SECRET_NAME \
+      --namespace $NAMESPACE \
+      --from-literal=token="$TOKEN" \
+      --from-literal=user="$USER" \
+      --dry-run=client -o yaml | kubectl apply -f -
+
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: secret-updater
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: secret-updater-role
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-updater-binding
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: secret-updater
+  namespace: default
+roleRef:
+  kind: Role
+  name: secret-updater-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+kubectl apply -f serviceaccount.yaml
+kubectl apply -f role.yaml
+kubectl apply -f rolebinding.yaml
+
+---
+FROM bitnami/kubectl:latest
+
+USER root
+RUN install_packages jq
+USER 1001
+
+---
+docker build -t your-repo/kubectl-jq:latest .
+docker push your-repo/kubectl-jq:latest
+
+--
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: update-secret-cronjob
+  namespace: default
+spec:
+  schedule: "0 0 * * *" # Daily at midnight
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: secret-updater
+          containers:
+          - name: update-secret
+            image: your-repo/kubectl-jq:latest
+            command: ["/bin/bash", "-c", "bash /scripts/update-secret.sh"]
+            volumeMounts:
+            - name: script-volume
+              mountPath: /scripts
+          restartPolicy: OnFailure
+          volumes:
+          - name: script-volume
+            configMap:
+              name: update-secret-script
+  
