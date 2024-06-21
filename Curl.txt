@@ -1,0 +1,31 @@
+# Stage 1: Build stage to install curl
+FROM ubuntu:20.04 AS builder
+
+# Install curl and its dependencies
+RUN apt-get update && \
+    apt-get install -y curl && \
+    apt-get install -y --no-install-recommends ldd && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Find out the curl dependencies and copy them
+RUN mkdir /curl-libs && \
+    ldd /usr/bin/curl | grep "=>" | awk '{print $3}' | xargs -I '{}' cp -v '{}' /curl-libs/ && \
+    cp /usr/bin/curl /curl-libs/
+
+# Stage 2: Base kubectl image
+FROM bitnami/kubectl:latest
+
+# Copy curl and its dependencies from builder
+COPY --from=builder /curl-libs/* /usr/lib/
+COPY --from=builder /usr/bin/curl /usr/bin/curl
+
+# Ensure curl works
+RUN ln -s /usr/lib/libnghttp2.so.14 /usr/lib/libnghttp2.so.14.17.0 && \
+    ln -s /usr/lib/libssl.so.1.1 /usr/lib/libssl.so.1.1 && \
+    ln -s /usr/lib/libcrypto.so.1.1 /usr/lib/libcrypto.so.1.1
+
+# Test curl
+RUN curl --version
+
+ENTRYPOINT ["kubectl"]
