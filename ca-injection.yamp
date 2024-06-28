@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app-pod
+  annotations:
+    cert-manager.io/inject-ca-from-secret: "my-ca-secret"  # Inject CA certificate
+    cert-manager.io/inject-cert-from-secret: "my-app-tls"  # Inject TLS certificate and key
+spec:
+  containers:
+    - name: my-app-container
+      image: my-app-image:latest
+      ports:
+        - containerPort: 8080
+      volumeMounts:
+        - name: ca-certs
+          mountPath: /etc/ssl/certs
+          readOnly: true
+        - name: tls-certs
+          mountPath: /etc/my-app/certs
+          readOnly: true
+  volumes:
+    - name: ca-certs
+      secret:
+        secretName: my-ca-secret
+    - name: tls-certs
+      secret:
+        secretName: my-app-tls
