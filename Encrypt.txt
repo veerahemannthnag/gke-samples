@@ -1,0 +1,85 @@
+To create a Dockerfile that sets up an encrypted filesystem using `fscrypt` within a Docker container, and assuming the host system has the necessary privileges to use `fscrypt`, you can follow these steps. 
+
+Note that Docker containers generally run without the necessary privileges to directly manage filesystems and encryption. Therefore, this example will focus on setting up the environment within the container, and you will need to run the container with elevated privileges (`--privileged`).
+
+Here's an example Dockerfile:
+
+```Dockerfile
+# Use a base image with the necessary tools
+FROM ubuntu:20.04
+
+# Install necessary packages
+RUN apt-get update && \
+    apt-get install -y fscrypt fuse cryptsetup && \
+    apt-get clean
+
+# Create directories for encrypted filesystem
+RUN mkdir -p /mnt/encrypted /opt/denodo/encryptme
+
+# Setup fscrypt
+RUN fscrypt setup --quiet
+
+# Add a script to setup and mount the encrypted filesystem
+COPY setup-encryption.sh /usr/local/bin/setup-encryption.sh
+RUN chmod +x /usr/local/bin/setup-encryption.sh
+
+# Run the setup script
+ENTRYPOINT ["/usr/local/bin/setup-encryption.sh"]
+```
+
+Create a `setup-encryption.sh` script:
+
+```bash
+#!/bin/bash
+set -e
+
+# Create a file to act as the encrypted volume
+dd if=/dev/zero of=/encrypted.img bs=1M count=1024  # Creates a 1GB file
+
+# Set up LUKS encryption on the file
+echo "yes" | cryptsetup luksFormat /encrypted.img
+
+# Open the encrypted file
+echo "password" | cryptsetup luksOpen /encrypted.img encrypted_volume
+
+# Create a filesystem on the encrypted volume
+mkfs.ext4 /dev/mapper/encrypted_volume
+
+# Mount the filesystem
+mount /dev/mapper/encrypted_volume /mnt/encrypted
+
+# Copy initial data to the encrypted filesystem
+cp -r /opt/denodo/encryptme /mnt/encrypted
+
+# Unmount and close the encrypted volume
+umount /mnt/encrypted
+cryptsetup luksClose encrypted_volume
+
+# Run the Denodo service (replace this with the actual Denodo start command)
+/opt/denodo/bin/denodo.sh start
+
+# Keep the container running
+tail -f /dev/null
+```
+
+### Build and Run the Docker Container
+
+1. **Build the Docker Image**:
+
+   ```bash
+   docker build -t denodo-encrypted .
+   ```
+
+2. **Run the Docker Container with Elevated Privileges**:
+
+   ```bash
+   docker run --privileged -it --name denodo-encrypted-container denodo-encrypted
+   ```
+
+### Notes
+
+- **Privileges**: The `--privileged` flag gives the container extended privileges. This is necessary for managing encrypted filesystems within the container.
+- **Encryption Password**: The password for LUKS encryption is hard-coded in the example for simplicity. In a production environment, ensure secure management of encryption keys and passwords.
+- **Initial Data**: Modify the script to suit your data copying needs. The example assumes there is initial data to copy into the encrypted volume.
+
+This setup provides a basic example. Depending on your specific requirements and security policies, further modifications and enhancements may be needed.
