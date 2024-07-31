@@ -108,3 +108,33 @@ RUN cp /usr/bin/lib*.so* /usr/lib/
 
 # Verify installation
 RUN sudo --version
+
+
+
+# Stage 1: Build stage
+FROM ubuntu:latest as build
+
+# Install necessary packages
+RUN apt-get update && apt-get install -y sudo
+
+# Create a directory to hold sudo and its dependencies
+RUN mkdir -p /sudo_copy/usr/bin /sudo_copy/usr/lib /sudo_copy/lib /sudo_copy/lib64
+
+# Copy sudo binary
+RUN cp /usr/bin/sudo /sudo_copy/usr/bin/
+
+# Copy sudo shared libraries
+RUN ldd /usr/bin/sudo | grep "=>" | awk '{print $3}' | xargs -I '{}' cp -v '{}' /sudo_copy/usr/lib/
+
+# Stage 2: Final stage
+FROM ubuntu:latest
+
+# Copy sudo and its shared libraries from the build stage to the final image
+COPY --from=build /sudo_copy/usr/bin/sudo /usr/bin/sudo
+COPY --from=build /sudo_copy/usr/lib/ /usr/lib/
+
+# Ensure the libraries are copied to /lib and /lib64 as well
+RUN cp -v /usr/lib/lib*.so* /lib/ || true && cp -v /usr/lib/lib*.so* /lib64/ || true
+
+# Verify installation
+RUN sudo --version
