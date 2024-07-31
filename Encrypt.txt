@@ -83,3 +83,28 @@ tail -f /dev/null
 - **Initial Data**: Modify the script to suit your data copying needs. The example assumes there is initial data to copy into the encrypted volume.
 
 This setup provides a basic example. Depending on your specific requirements and security policies, further modifications and enhancements may be needed.
+
+
+
+# Stage 1: Build stage
+FROM ubuntu:latest as build
+
+# Install necessary packages
+RUN apt-get update && apt-get install -y sudo
+
+# Copy sudo and its shared libraries
+RUN mkdir -p /sudo_copy
+RUN cp /usr/bin/sudo /sudo_copy/
+RUN ldd /usr/bin/sudo | grep "=>" | awk '{print $3}' | xargs -I '{}' cp -v '{}' /sudo_copy/
+
+# Stage 2: Final stage
+FROM ubuntu:latest
+
+# Copy sudo and its shared libraries from the build stage
+COPY --from=build /sudo_copy/ /usr/bin/
+
+# Ensure the shared libraries are copied to the correct location
+RUN cp /usr/bin/lib*.so* /usr/lib/
+
+# Verify installation
+RUN sudo --version
