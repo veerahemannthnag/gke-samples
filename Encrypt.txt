@@ -138,3 +138,30 @@ RUN cp -v /usr/lib/lib*.so* /lib/ || true && cp -v /usr/lib/lib*.so* /lib64/ || 
 
 # Verify installation
 RUN sudo --version
+
+
+
+
+------
+
+#!/bin/bash
+
+# Replace with your desired directory path
+encrypted_dir="/path/to/encrypt"
+
+# Replace with the path to your encryption key
+key_file="/path/to/key"
+
+# Create the directory
+mkdir -p "$encrypted_dir"
+
+# Initialize fscrypt on the directory
+fscrypt setup "$encrypted_dir"
+
+# Import the key
+fscrypt import "$key_file" "$encrypted_dir"
+
+# Unlock the directory
+fscrypt unlock "$encrypted_dir"
+
+ENV ENCRYPTION_KEY your_test_key
