@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bq-table-cleanup
+spec:
+  schedule: "0 1 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: bq-cleanup-sa
+          containers:
+          - name: cleanup
+            image: google/cloud-sdk:slim
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              PROJECT_ID="my-project"
+              DATASET_ID="my_dataset"
+
+              echo "Finding tables older than today..."
+
+              TABLES=$(bq query \
+                --project_id="$PROJECT_ID" \
+                --nouse_legacy_sql \
+                --format=csv \
+                "SELECT table_id
+                 FROM \`$PROJECT_ID.$DATASET_ID.__TABLES__\`
+                 WHERE TIMESTAMP_MILLIS(creation_time) < TIMESTAMP(CURRENT_DATE())" | tail -n +2)
+
+              for TABLE in $TABLES; do
+                echo "Deleting table: $DATASET_ID.$TABLE"
+                bq rm -f -t "$PROJECT_ID:$DATASET_ID.$TABLE"
+              done
+
+              echo "Cleanup complete."
