@@ -41,3 +41,61 @@ spec:
               done
 
               echo "Cleanup complete."
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bq-dataset-cleanup
+spec:
+  schedule: "0 1 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: bq-cleanup-sa
+          containers:
+          - name: cleanup
+            image: google/cloud-sdk:slim
+            env:
+            - name: PROJECT_ID
+              value: "my-project"
+            - name: DATASETS
+              value: "dataset_a,dataset_b,dataset_c"
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              # Split comma-separated datasets into an array
+              IFS=',' read -ra DATASET_ARRAY <<< "$DATASETS"
+
+              for DATASET in "${DATASET_ARRAY[@]}"; do
+                echo "---------------------------------------"
+                echo "Processing dataset: $DATASET"
+                echo "---------------------------------------"
+
+                TABLES=$(bq query \
+                  --project_id="$PROJECT_ID" \
+                  --nouse_legacy_sql \
+                  --format=csv \
+                  "SELECT table_id
+                   FROM \`$PROJECT_ID.$DATASET.__TABLES__\`
+                   WHERE TIMESTAMP_MILLIS(creation_time) < TIMESTAMP(CURRENT_DATE())" | tail -n +2)
+
+                if [ -z "$TABLES" ]; then
+                  echo "No old tables found in $DATASET"
+                  continue
+                fi
+
+                for TABLE in $TABLES; do
+                  echo "Deleting table: $DATASET.$TABLE"
+                  bq rm -f -t "$PROJECT_ID:$DATASET.$TABLE"
+                done
+              done
+
+              echo "Dataset cleanup complete."
