@@ -1,0 +1,13 @@
+KMS_KEY=$(bq show --format=prettyjson PROJECT_ID:DATASET_ID \
+  | sed -n 's/.*"kmsKeyName": "\(.*\)".*/\1/p')
+
+
+bq query --use_legacy_sql=false "
+SELECT
+  schema_name AS dataset_name,
+  default_kms_key_name
+FROM
+  \`PROJECT_ID.REGION.INFORMATION_SCHEMA.SCHEMATA\`
+WHERE
+  schema_name = 'DATASET_ID';
+"
